@@ -1,8 +1,11 @@
 ﻿# include <Siv3D.hpp>
 
+// 前方宣言
+class Ball;
+
 /// @brief ブロック
 class Brick {
-	const Size Size{ 40, 20 };
+	inline static const Size Size{ 40, 20 };
 
 	Rect rect;
 
@@ -15,6 +18,8 @@ public:
 	void draw() {
 		rect.stretched(-1).draw(HSV{ rect.y - 40 });
 	}
+
+	bool reflect(Ball& refBall);
 };
 
 /// @brief ボール
@@ -46,17 +51,61 @@ public:
 	void draw() {
 		ball.draw();
 	}
+
+	Vec2& getVelocity() { return velocity; }
+	const Circle& getBall() const { return ball; }
+	const double getSpeed() const { return SpeedPerSec; }
 };
 
 /// @brief パドル
 class Paddle {
+	Rect paddle;
+
 public:
-	void update() {}
+	Paddle()
+		: paddle(Rect{ Arg::center(Cursor::Pos().x, 500), 60, 10 })
+	{}
+
+	void update() {
+		paddle.pos.x = Cursor::Pos().x - 30;
+		//paddle.setPos(Arg::center(Cursor::Pos().x, 500));
+	}
 	void draw() {
-		const Rect paddle{ Arg::center(Cursor::Pos().x, 500), 60, 10 };
 		paddle.rounded(3).draw();
 	}
+
+	bool reflect(Ball& refBall);
 };
+
+bool Brick::reflect(Ball& refBall)
+{
+	auto& ball	= refBall.getBall();
+	auto& vec	= refBall.getVelocity();
+	if (rect.intersects(ball)) {
+		if (rect.bottom().intersects(ball) || rect.top().intersects(ball))
+		{
+			vec.y *= -1;
+		}
+		else // ブロックの左辺または右辺と交差していたら
+		{
+			vec.x *= -1;
+		}
+
+		return true;
+	}
+	return false;
+}
+bool Paddle::reflect(Ball& refBall)
+{
+	auto& ball = refBall.getBall();
+	auto& vec = refBall.getVelocity();
+	if ((0 < vec.y) && paddle.intersects(ball))
+	{
+		vec = Vec2{ (ball.x - paddle.center().x) * 10, -vec.y }.setLength(refBall.getSpeed());
+		return true;
+	}
+	return false;
+}
 
 void Main()
 {
@@ -81,46 +130,21 @@ void Main()
 		ball.update();
 		paddle.update();
 
+		// 衝突判定
+		for (auto it = bricks.begin(); it != bricks.end(); ++it) {
+			if (it->reflect(ball)) {
+				bricks.erase(it);	// ブロックを消す
+				break;
+			}
+		}
+		paddle.reflect( ball );
+
 		// 描画
 		for (auto& brick : bricks) {
 			brick.draw();
 		}
 		ball.draw();
 		paddle.draw();
-
-		//// ブロックを順にチェックする | Check bricks in sequence
-		//for (auto it = bricks.begin(); it != bricks.end(); ++it)
-		//{
-		//	// ブロックとボールが交差していたら | If block and ball intersect
-		//	if (it->intersects(ball))
-		//	{
-		//		// ブロックの上辺、または底辺と交差していたら | If ball intersects with top or bottom of the block
-		//		if (it->bottom().intersects(ball) || it->top().intersects(ball))
-		//		{
-		//			// ボールの速度の Y 成分の符号を反転する | Reverse the sign of the Y component of the ball's velocity
-		//			ballVelocity.y *= -1;
-		//		}
-		//		else // ブロックの左辺または右辺と交差していたら
-		//		{
-		//			// ボールの速度の X 成分の符号を反転する | Reverse the sign of the X component of the ball's velocity
-		//			ballVelocity.x *= -1;
-		//		}
-
-		//		// ブロックを配列から削除する（イテレータは無効になる） | Remove the block from the array (the iterator becomes invalid)
-		//		bricks.erase(it);
-
-		//		// これ以上チェックしない | Do not check any more
-		//		break;
-		//	}
-		//}
-
-
-		//// パドルにあたったら | If the ball hits the left or right wall
-		//if ((0 < ballVelocity.y) && paddle.intersects(ball))
-		//{
-		//	// パドルの中心からの距離に応じてはね返る方向（速度ベクトル）を変える | Change the direction (velocity vector) of the ball depending on the distance from the center of the paddle
-		//	ballVelocity = Vec2{ (ball.x - paddle.center().x) * 10, -ballVelocity.y }.setLength(BallSpeedPerSec);
-		//}
 
 		//// マウスカーソルを非表示にする | Hide the mouse cursor
 		//Cursor::RequestStyle(CursorStyle::Hidden);
