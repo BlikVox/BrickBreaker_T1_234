@@ -5,10 +5,6 @@ void Main()
 {
 	GameMain game;
 
-	int* pValue = new int(100);
-	delete pValue;
-	//pValue = nullptr;
-
 	while (System::Update())
 	{
 		game.update();
